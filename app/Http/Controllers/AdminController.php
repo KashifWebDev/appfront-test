@@ -61,8 +61,6 @@ class AdminController extends Controller
         // Store the old price before updating
         $oldPrice = $product->price;
 
-        $product->update($request->all());
-
         if ($request->hasFile('image')) {
             $file = $request->file('image');
             $filename = $file->getClientOriginalExtension();
@@ -71,11 +69,14 @@ class AdminController extends Controller
         }
 
         $this->productService->updateProduct($id, $request->validated());
-        $product->save();
 
         // Check if price has changed
         if ($oldPrice != $product->price) {
-            dispatch(new SendPriceChangeNotification($product));
+            dispatch(new SendPriceChangeNotification(
+                $product,
+                $oldPrice,
+                $request->price
+            ));
         }
 
         return redirect()->route('admin.products')->with('success', 'Product updated successfully');

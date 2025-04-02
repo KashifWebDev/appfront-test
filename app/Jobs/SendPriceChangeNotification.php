@@ -26,12 +26,12 @@ class SendPriceChangeNotification implements ShouldQueue
      *
      * @return void
      */
-    public function __construct($product, $oldPrice, $newPrice, $email)
+    public function __construct($product, $oldPrice, $newPrice)
     {
         $this->product = $product;
         $this->oldPrice = $oldPrice;
         $this->newPrice = $newPrice;
-        $this->email = $email;
+        $this->email = config('app.admin_email');
     }
 
     /**
