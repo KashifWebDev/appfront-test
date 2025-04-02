@@ -2,21 +2,29 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ProductUpdateRequest;
+use App\Services\ProductService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Product;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use App\Jobs\SendPriceChangeNotification;
+use Illuminate\View\View;
 
 class AdminController extends Controller
 {
-    public function loginPage()
+    public function __construct(protected ProductService $productService){
+        //
+    }
+
+    public function loginPage(): View
     {
         return view('login');
     }
 
-    public function login(Request $request)
+    public function login(Request $request): RedirectResponse
     {
         if (Auth::attempt($request->except('_token'))) {
             return redirect()->route('admin.products');
@@ -25,39 +33,30 @@ class AdminController extends Controller
         return redirect()->back()->with('error', 'Invalid login credentials');
     }
 
-    public function logout()
+    public function logout(): RedirectResponse
     {
         Auth::logout();
         return redirect()->route('login');
     }
 
-    public function products()
+    public function products(): View
     {
-        $products = Product::all();
+        $products = $this->productService->getAllProducts();
         return view('admin.products', compact('products'));
     }
 
-    public function editProduct($id)
+    public function editProduct($id): View
     {
-        $product = Product::find($id);
+        $product = $this->productService->findProductById($id);
         return view('admin.edit_product', compact('product'));
     }
 
-    public function updateProduct(Request $request, $id)
+    public function updateProduct(ProductUpdateRequest $request, $id)
     {
-        // Validate the name field
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|min:3',
-        ]);
-
-        if ($validator->fails()) {
-            return redirect()
-                ->back()
-                ->withErrors($validator)
-                ->withInput();
+        $product = $this->productService->findProductById($id);
+        if (!$product) {
+            return redirect()->back()->with('error', 'Product not found.');
         }
-
-        $product = Product::find($id);
 
         // Store the old price before updating
         $oldPrice = $product->price;
@@ -71,23 +70,12 @@ class AdminController extends Controller
             $product->image = 'uploads/' . $filename;
         }
 
+        $this->productService->updateProduct($id, $request->validated());
         $product->save();
 
         // Check if price has changed
         if ($oldPrice != $product->price) {
-            // Get notification email from env
-            $notificationEmail = env('PRICE_NOTIFICATION_EMAIL', 'admin@example.com');
-
-            try {
-                SendPriceChangeNotification::dispatch(
-                    $product,
-                    $oldPrice,
-                    $product->price,
-                    $notificationEmail
-                );
-            } catch (\Exception $e) {
-                 Log::error('Failed to dispatch price change notification: ' . $e->getMessage());
-            }
+            dispatch(new SendPriceChangeNotification($product));
         }
 
         return redirect()->route('admin.products')->with('success', 'Product updated successfully');
