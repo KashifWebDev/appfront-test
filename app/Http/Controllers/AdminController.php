@@ -8,8 +8,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Product;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Validator;
 use App\Jobs\SendPriceChangeNotification;
 use Illuminate\View\View;
 
@@ -82,7 +80,7 @@ class AdminController extends Controller
         return redirect()->route('admin.products')->with('success', 'Product updated successfully');
     }
 
-    public function deleteProduct($id)
+    public function deleteProduct($id): RedirectResponse
     {
         $product = Product::find($id);
         $product->delete();
@@ -90,24 +88,13 @@ class AdminController extends Controller
         return redirect()->route('admin.products')->with('success', 'Product deleted successfully');
     }
 
-    public function addProductForm()
+    public function addProductForm(): View
     {
         return view('admin.add_product');
     }
 
-    public function addProduct(Request $request)
+    public function addProduct(ProductUpdateRequest $request): RedirectResponse
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|min:3',
-        ]);
-
-        if ($validator->fails()) {
-            return redirect()
-                ->back()
-                ->withErrors($validator)
-                ->withInput();
-        }
-
         $product = Product::create([
             'name' => $request->name,
             'description' => $request->description,
